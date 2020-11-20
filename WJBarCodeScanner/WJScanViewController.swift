@@ -5,62 +5,61 @@
 //  Created by wj on 15/12/4.
 //  Copyright © 2015年 wj. All rights reserved.
 //
-
 import UIKit
 import AVFoundation
 
-
 @IBDesignable
-public
-class WJScanViewController: UIViewController ,AVCaptureMetadataOutputObjectsDelegate{    
+class WJScanViewController: UIViewController,AVCaptureMetadataOutputObjectsDelegate{
     
-    public  let session = AVCaptureSession()
-    public  let output = AVCaptureMetadataOutput()
-    public  var input:AVCaptureDeviceInput?
+    let session = AVCaptureSession()
+    let output = AVCaptureMetadataOutput()
+    var input:AVCaptureDeviceInput?
 
-    private var scanView :WJScanView?
+    fileprivate var scanView :WJScanView?
     
-    public  var metadataObjectTypes = [ AVMetadataObjectTypeUPCECode,
-                                AVMetadataObjectTypeCode39Code,
-                                AVMetadataObjectTypeCode39Mod43Code ,
-                                AVMetadataObjectTypeEAN13Code ,
-                                AVMetadataObjectTypeEAN8Code ,
-                                AVMetadataObjectTypeCode93Code ,
-                                AVMetadataObjectTypeCode128Code ,
-                                AVMetadataObjectTypePDF417Code ,
-                                AVMetadataObjectTypeQRCode ,
-                                AVMetadataObjectTypeAztecCode ,
-                                AVMetadataObjectTypeInterleaved2of5Code ,
-                                AVMetadataObjectTypeITF14Code ,
-                                AVMetadataObjectTypeDataMatrixCode        ]
+    var metadataObjectTypes = [ AVMetadataObject.ObjectType.upce,
+                                AVMetadataObject.ObjectType.code39,
+                                AVMetadataObject.ObjectType.code39Mod43 ,
+                                AVMetadataObject.ObjectType.ean13 ,
+                                AVMetadataObject.ObjectType.ean8 ,
+                                AVMetadataObject.ObjectType.code93 ,
+                                AVMetadataObject.ObjectType.code128 ,
+                                AVMetadataObject.ObjectType.pdf417 ,
+                                AVMetadataObject.ObjectType.qr ,
+                                AVMetadataObject.ObjectType.aztec ,
+                                AVMetadataObject.ObjectType.interleaved2of5 ,
+                                AVMetadataObject.ObjectType.itf14 ,
+                                AVMetadataObject.ObjectType.dataMatrix        ]
         {
         didSet{
-            output.metadataObjectTypes = metadataObjectTypes
+            if input != nil{
+                output.metadataObjectTypes = metadataObjectTypes
+            }
         }
     }
     
     @IBInspectable
-    public
-    var scanColor:UIColor = UIColor.greenColor(){ didSet{  scanView?.scanColor = scanColor } }
+    var scanColor:UIColor = UIColor.green{ didSet{  scanView?.scanColor = scanColor } }
     
-    public
-    var transparentArea = CGRectZero{
+    var transparentArea = CGRect.zero{
         didSet{
             print("disSet transparentArea to \(transparentArea)")
             scanView?.transparentArea = transparentArea
-            output.rectOfInterest = CGRectMake(transparentArea.origin.y/view.frame.height,
-                                               transparentArea.origin.x/view.frame.width,
-                                               transparentArea.height/view.frame.height,
-                                               transparentArea.width/view.frame.width)
+            output.rectOfInterest = CGRect(x: transparentArea.origin.y/view.frame.height,
+                                               y: transparentArea.origin.x/view.frame.width,
+                                               width: transparentArea.height/view.frame.height,
+                                               height: transparentArea.width/view.frame.width)
         }
     }
     
 
-    override public  func viewDidLoad() {
+    override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor.clearColor()
+        view.backgroundColor = UIColor.clear
         
-        let device = AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeVideo)
+        guard let device = AVCaptureDevice.default(for: .video) else{
+            return
+        }
         
         do  {
             input = try AVCaptureDeviceInput(device: device)
@@ -69,24 +68,29 @@ class WJScanViewController: UIViewController ,AVCaptureMetadataOutputObjectsDele
             return
         }
         
-        output.setMetadataObjectsDelegate(self, queue: dispatch_get_main_queue())
+        guard let input = try? AVCaptureDeviceInput(device: device) else{
+            return
+        }
         
-        session.sessionPreset = AVCaptureSessionPresetHigh
+        output.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
+        
+        session.sessionPreset = AVCaptureSession.Preset.high
         session.addInput(input)
         session.addOutput(output)
         output.metadataObjectTypes = metadataObjectTypes
 
         let preview = AVCaptureVideoPreviewLayer(session: session)
-        preview.videoGravity = AVLayerVideoGravityResize
+        preview.videoGravity = AVLayerVideoGravity.resize
         preview.frame = view.bounds
-        view.layer.insertSublayer(preview, atIndex: 0)
+        view.layer.insertSublayer(preview, at: 0)
+        session.startRunning()
         
         scanView = WJScanView(frame: view.bounds)
         scanView!.scanColor = scanColor
-        view.insertSubview(scanView!, atIndex: 1)
+        view.insertSubview(scanView!, at: 1)
         
         //congifure transparentArea
-        if transparentArea == CGRectZero{
+        if transparentArea == CGRect.zero{
             transparentArea = CGRect(x: view.center.x-100, y: view.center.y-100, width: 200, height: 200)
         }else{
             let rect = transparentArea
@@ -94,30 +98,29 @@ class WJScanViewController: UIViewController ,AVCaptureMetadataOutputObjectsDele
         }
     }
     
-    override public func viewDidAppear(animated: Bool) {
+    override func viewDidAppear(_ animated: Bool) {
         if input == nil{
             handleCameraWithoutAuth()
-        } else {
-            session.startRunning()
         }
     }
     
-    //override in your subclass 
-    public  func captureOutput(captureOutput: AVCaptureOutput!, didOutputMetadataObjects metadataObjects: [AnyObject]!, fromConnection connection: AVCaptureConnection!) {
+    //override in your subclass
+    public func captureOutput(_ captureOutput: AVCaptureOutput!, didOutputMetadataObjects metadataObjects: [Any]!, from connection: AVCaptureConnection!) {
         print("11")
         if  let metadataObject = metadataObjects.first {
-            let stringValue = (metadataObject as! AVMetadataMachineReadableCodeObject).stringValue
-            print(stringValue)
+            if let stringValue = (metadataObject as! AVMetadataMachineReadableCodeObject).stringValue{
+                print(stringValue)
+            }
         }
     }
     
     //Lock Orientations to Portrait
-    public  override func supportedInterfaceOrientations() -> UIInterfaceOrientationMask {
-        return .Portrait
+    override var supportedInterfaceOrientations : UIInterfaceOrientationMask {
+        return .portrait
     }
     
     //access to camera denied
-    public  func handleCameraWithoutAuth(){
+    func handleCameraWithoutAuth(){
         print("handleCameraWithoutAuth")
     }
     
